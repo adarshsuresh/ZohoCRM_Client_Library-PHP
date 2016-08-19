@@ -63,7 +63,7 @@ class ZClient
     /**
      * Default url for all Zoho CRM API requets.
      */
-    const _DEFAULT_ZOHO_URL = 'https://crm.localzoho.com/crm/v2/';
+    const _DEFAULT_ZOHO_URL = '';
     /**
      * Default file name to store metadata.
      */
