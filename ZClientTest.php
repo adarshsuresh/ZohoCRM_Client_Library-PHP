@@ -33,11 +33,11 @@
 require_once('zohoclient.php');
 require_once('zohoobject.php');
 require_once('zohoutils.php');
-$client_id = '1000.5J0TRY46P0UT81407PZD4UGESRJLJH';
-$client_secret = '1f1548b0b572dd7679898a502b208ae4823004de5e';
-$redirect_uri = 'http://adarshsuresh-env.us-east-1.elasticbeanstalk.com/myindex.php';
-$refresh_token = '1000.d33dbcdd56d9cfb2fb1b2e38646246e9.78817078b435c29e655b4d326374dd65';
-$access_token = 'e6ab9925d15aa7a742800435ad515902';
+$client_id = '';
+$client_secret = '';
+$redirect_uri = '';
+$refresh_token = '';
+$access_token = '';
 $zclient;
 
 class ZClientTest extends PHPUnit_Framework_TestCase
