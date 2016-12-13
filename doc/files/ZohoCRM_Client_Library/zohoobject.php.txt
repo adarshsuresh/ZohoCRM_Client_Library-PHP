@@ -1,0 +1,366 @@
+<?php
+/**
+ *
+ * This file has the class ZObject which hold all the records that are being retreived and also provides special functionalities for
+ * these entities.
+ *
+ * @package ZohoCRM_Client_Library
+ */
+/**
+ * @copyright (c) 2016.  Zoho Corporation
+ *  All rights reserved.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided
+ *  that the following conditions are met:
+ *  
+ *  Redistributions of source code must retain the above copyright notice, this list of conditions and the
+ *  following disclaimer.
+ *  
+ *  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+ *  the following disclaimer in the documentation and/or other materials provided with the distribution.
+ *  
+ *  Neither the name of Zoho Corp nor the names of its contributors may be used to endorse or
+ *  promote products derived from this software without specific prior written permission.
+ *  
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ *  PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ *  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ *  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author Adarsh Suresh Managalth <adarsh@zohocorp.com>
+ * 
+ */
+require_once ('zohoclient.php');
+
+/**
+ * Class ZObject
+ * Provides object related functionalities for each seperate record.Also provides array like access for its object.
+ * <code>$obj=new ZObject($zclient,..);
+ *       obj['Last_Name']="Last Name";
+ * </code>
+ */
+class ZObject implements ArrayAccess
+{
+    /**
+     * The ZClient for the API requests
+     * @access private
+     * @var curlObject
+     */
+    private $zclient=NULL;
+    /**
+     * The array in which all the record details are stored.
+     * @access public
+     * @var array
+     */
+    public $dict=array();
+    /**
+     * Module of the ZObject
+     * @access public
+     * @var string
+     */
+    public $module=FILTER_FLAG_EMPTY_STRING_NULL;
+    /**
+     * Message returned from the last call
+     * @access public
+     * @var string
+     */
+    public $message=FILTER_FLAG_EMPTY_STRING_NULL;
+    /**
+     * Status returned from the last call
+     * @access public
+     * @var string
+     */
+    public $status=FILTER_FLAG_EMPTY_STRING_NULL;
+    /**
+     * Action taken for the last call (Mainly used for upserted records).
+     * @access public
+     * @var string
+     */
+    public $action=FILTER_FLAG_EMPTY_STRING_NULL;
+    /**
+     * Metadata of the module.
+     * @access public
+     * @var array
+     */
+    public $metadata=NULL;
+
+    /**
+     * ZObject constructor.
+     * @param $zclient The client for the ZObject. Will be ZClient class
+     * @param $json The data retreived for that perticular record.
+     * @param $module Module of the record
+     * @param null $metadata Metadats of the module
+     * @param string $message Message returned while getting , inserting or updating a record.
+     * @param string $status Status returned while getting , inserting or updating a record.
+     * @param string $action Action returned while upserting a record.
+     */
+    function __construct(&$zclient , $json , $module ,$metadata=NULL,$message="" ,$status="",$action="")
+    {
+        $this->zclient=$zclient;
+        $this->dict=$json;
+        $this->module=$module;
+        $this->message=$message;
+        $this->status=$status;
+        $this->action=$action;
+        $this->metadata=$metadata;
+
+    }
+
+    /**
+     * @internal
+     * Array access method for ZObject. Set array Method.
+     * @param mixed $offset The key of the array.
+     * @param mixed $value The value for the key.
+     */
+    public function offsetSet($offset, $value) {
+        if (is_null($offset)) {
+            $this->dict[] = $value;
+        } else {
+            $this->dict[$offset] = $value;
+        }
+    }
+
+    /**
+     * @internal
+     * Array access method for ZObject. Exists array Method.
+     * @param mixed $offset The key to check exsits in  the array.
+     * @return bool
+     */
+    public function offsetExists($offset) {
+        return isset($this->dict[$offset]);
+    }
+
+    /**
+     * @internal
+     * Array access method for ZObject. Unset array Method.
+     * @param mixed $offset The key to be unset in the array.
+     */
+    public function offsetUnset($offset) {
+        unset($this->dict[$offset]);
+    }
+
+    /**
+     * @internal
+     * Array access method for ZObject. Get array Method.
+     * @param mixed $offset The key for get request.
+     * @return mixed|null
+     */
+    public function offsetGet($offset) {
+        return isset($this->dict[$offset]) ? $this->dict[$offset] : null;
+    }
+
+
+    /**
+     * Get the record of module if id is provided ( helps to get full data after updating/upserting a record).
+     */
+    public function get()
+    {
+        print $this['id']."\n";
+        $obj=$this->zclient->get_id($this->module,$this['id']);
+        if(isset($obj)) {
+            $this->dict = $obj->dict;
+            $this->message = $obj->message;
+            $this->status = $obj->status;
+            $this->action = $obj->action;
+        }
+    }
+
+    /**
+     * Loads metadata of the module from server or local file.
+     * <br><b>Note:</b>No need to use if loadmodules have been used already.
+     * @param $file True to load from local file and false to load from server.
+     */
+    public function loadmetadata($file)
+    {
+        $metadata=$this->zclient->loadmodules($file,array($this->module));
+        $this->metadata=$metadata[$this->module];
+        
+    }
+
+    /**
+     * To update the record in server after editing.
+     */
+    public function update()
+    {
+        $retOBJ=$this->zclient->update($this->module,array($this->getJSON_array()));
+        if(isset($retOBJ[0])) {
+            $this->dict = $retOBJ[0]->dict;
+            $this->message = $retOBJ[0]->message;
+            $this->status = $retOBJ[0]->status;
+            if(strcmp($this->status,"success")==0)
+                $this->action = "Updated";
+            }
+    }
+
+    /**
+     * To delete the record in server.
+     */
+    public function delete()
+    {
+        $retOBJ=$this->zclient->delete($this->module,$this['id']);
+        if(isset($retOBJ)) {
+            $this->message = $retOBJ['message'];
+            $this->status = $retOBJ['status'];
+            if(strcmp($retOBJ['status'],"success")==0)
+                $this->action = "Deleted";
+        }
+    }
+
+    /**
+     * To retreive the related list of the module.
+     * @param $module Related module of the record
+     * @param null $related_list_id  Id  provided in the metadata of the module as list_relation_id.
+     * <br><b>Note:</b> If loadmodules is used and related_list_id if provided null ,related _list_id will be fetched from metadata.conf
+     * @return mixed An array of ZObjects of related module.
+     */
+    public function related_list($module,$related_list_id=NULL)
+    {
+        return $this->zclient->related_list($this->module,$this['id'],$module,$related_list_id);
+    }
+
+    /**
+     * Add notes under the perticular module.
+     * @param $notes The JSON data for notes.
+     * @return mixed A list of newly added notes.
+     */
+    public function insert_notes($notes)
+    {
+        return $this->zclient->insert_notes($this->module,$this['id'],$notes);
+    }
+
+    /**
+     * To add a new relation to the module.
+     *
+     * Supported Modules :
+     *
+     * Campaigns -> Leads, Contacts
+     *
+     * Products -> Leads, Contacts, Accounts, Potentials, Price Books
+     * or their reverse as in Leads -> Campaings , Products
+     *
+     * Sample Data For Adding Relation Between Leads, Campaigns (Not Mandatory, you can send the request without body)
+     * datalist:[ {"Status" : "active"}]
+     *
+     * Sample Data For Adding Relation Between Contact, Potentials (Mandatory, you need to send body)
+     * datalist :[ {"Contact_Role" : "1000000024229"}]
+     *
+     * Sample Data For Adding Relation Between Products, Price_Books (Mandatory, you need to send body)
+     * datalist :[ {"list_price" : 50.56}]
+     *
+     * @param $module The module of related record.
+     * @param $related_list_id List_relation_id of the module.
+     * <br><b>Note:</b> If loadmodules is used and related_list_id if provided null ,related _list_id will be fetched from metadata.conf
+     * @param $entity_id Id of the related record.
+     * @param $data Data which should be populated.
+     * @return mixed An array of zobjects with returned result.
+     */
+    public function update_relation($module,$related_list_id,$entity_id,$data)
+    {
+        return $this->zclient->update_relation($this->module,$this['id'],$module,$related_list_id,$entity_id,$data);
+    }
+
+    /**
+     * To delete an exsisting relation between modules.
+     * @param $module The module which is related.
+     * @param $related_list_id  List_relation_id of the relation.
+     * <br><b>Note:</b> If loadmodules is used and related_list_id if provided null ,related _list_id will be fetched from metadata.conf
+     * @param $entity_id Id of the related record.
+     * @return mixed Details of the deletion.
+     */
+    public function delete_relation($module,$related_list_id,$entity_id)
+    {
+        return $this->zclient->delete_relation($this->module,$this['id'],$module,$related_list_id,$entity_id);
+    }
+
+    /**
+     * To upload an attachment with the record.
+     * @param $filename File to be attached with full path.
+     * @param null $list_relation_id  List_relation_id of the attachments in the module.
+     * <br><b>Note:</b> If loadmodules is used and related_list_id if provided null ,related _list_id will be fetched from metadata.conf
+     * @return mixed Details about the upload is returned.
+     */
+    public function upload_attachment($filename,$list_relation_id=NULL)
+    {
+        return $this->zclient->upload_file($this->module,$this['id'],$list_relation_id,$filename);
+    }
+
+    /**
+     * To download an attachment with the record.
+     * @param $fileid Id of the file to be downloaded.
+     * @param $filename File name under which it should be saved.
+     * @param null $list_relation_id ist_relation_id of the attachments in the module.
+     * <br><b>Note:</b> If loadmodules is used and related_list_id if provided null ,related _list_id will be fetched from metadata.conf
+     * @return mixed Details about the upload is returned.
+     */
+    public function download_attachment($fileid,$filename,$list_relation_id=NULL)
+    {
+        return $this->zclient->download_file($this->module,$this['id'],$list_relation_id,$fileid,$filename);
+    }
+
+    /**
+     * To convert a lead.
+     * <br><b>Note:</b> Support only for Leads module.
+     * @param $data The details of conversion.
+     * @return mixed Details regarding the conversion.
+     */
+    public function convert_lead($data)
+    {
+        if (strcmp($this->module,"Leads")==0)
+            return $this->zclient->convert_lead($this['id'],$data);
+    }
+
+    /**
+     * To upload a photo to module.
+     * <br><b>Note:</b> Support only for Contacts and Leads module.
+     * @param $filename Name of the photo to be uploaded.
+     * @return mixed Details regarding the uploaded photo.
+     */
+    public function upload_photo($filename)
+    {
+        if (strcmp($this->module,"Leads")==0||strcmp($this->module,"Contacts"))
+            return $this->zclient->upload_photo($this->module,$this['id'],$filename,NULL);
+    }
+
+    /**
+     * To download a photo to module.
+     * <br><b>Note:</b> Support only for Contacts and Leads module.
+     * @param $filename Name of the photo to be downloaded and saved.
+     * @return mixed Details regarding the uploaded photo.
+     */
+    public function download_photo($filename)
+    {
+        if (strcmp($this->module,"Leads")==0||strcmp($this->module,"Contacts"))
+            return $this->zclient->download_photo($this->module,$this['id'],$filename,NULL);
+    }
+    /**
+     * Returns the JSON array depending on the module metadata if provied or returns the entire data.
+     * @return array
+     */
+    public function getJSON_array()
+    {
+
+        if(isset($this->metadata)) {
+            $myjson=array();
+            $fields = $this->metadata['fields'];
+            foreach ($fields as $field) {
+                if (($field["view_type"]["edit"] || $field["view_type"]["create"]) && !preg_match('/lookup/', $field["data_type"])) {
+
+                    $inputvalue = $this[$field["api_name"]];
+                    if (!is_null($inputvalue))
+                        $myjson[$field["api_name"]] = $this[$field["api_name"]];
+                }
+            }
+            if (!is_null($this["id"]))
+                $myjson["id"] = $this["id"];
+            return $myjson;
+        }
+        else
+        {
+            return $this->dict;
+        }
+
+    }
+}

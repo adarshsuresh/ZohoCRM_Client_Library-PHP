@@ -1,0 +1,225 @@
+<?php
+/**
+ *
+ * This file contains usage and testing features for the ZohoCRM_Client_Library.
+ *
+ */
+/**
+ * @copyright (c) 2016.  Zoho Corporation
+ *  All rights reserved.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided
+ *  that the following conditions are met:
+ *
+ *  Redistributions of source code must retain the above copyright notice, this list of conditions and the
+ *  following disclaimer.
+ *
+ *  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+ *  the following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  Neither the name of Zoho Corp nor the names of its contributors may be used to endorse or
+ *  promote products derived from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ *  PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ *  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ *  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author Adarsh Suresh Managalth <adarsh@zohocorp.com>
+ */
+
+require_once('ZohoCRM_Client_Library/zohoclient.php');
+require_once('ZohoCRM_Client_Library/zohoobject.php');
+require_once('ZohoCRM_Client_Library/zohoutils.php');
+function OutputJSON($tag, $usage, $jsonarray)
+{
+    echo "<H1>" . $tag . "</H1>";
+    echo "<H3>USGAE:" . $usage . "</H3>";
+    echo "<H3>RESULT</H3>";
+    foreach ($jsonarray as $object) {
+        echo "<p>" . var_dump($object) . "</p>";
+    }
+}
+
+function OutputObjects($tag, $usage, $objectarray)
+{
+    echo "<H1>" . $tag . "</H1>";
+    echo "<H3>USGAE:" . $usage . "</H3>";
+    echo "<H3>RESULT</H3>";
+    foreach ($objectarray as $object) {
+        echo "<p> <b>Type: </b>" . gettype($object) . "<br><b>Record type:</b>" . $object->module . "<br><b>Message: </b>" . $object->message . "<br><b>Status: </b>" . $object->status . "<br><b>Action:</b> " . $object->action . "</p>";
+        echo "<p>" . var_dump($object->dict) . "</p>";
+    }
+}
+
+?>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Zoho CRM Client Library Test</title>
+    <meta name="description" content="Client Library Test">
+    <meta name="author" content="Zoho CRM">
+
+    <link rel="stylesheet" href="css/styles.css?v=1.0">
+
+    <!--[if lt IE 9]>
+    <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+</head>
+
+<body>
+<p>Please run the test with php display errors on and check if any error ocuurs.</p>
+<?php
+
+/**
+ * Username for the account .
+ */
+$username = "adarsh@zohocorp.com";
+
+/**
+ * Password for the account.
+ */
+$password = "9a5z4f8ush2p   ";
+
+/**
+ *
+ *Generating an ZClient for all other API call with help of username/password or just with authtoken.
+ */
+//$zclient = new ZClient(NULL, $username, $password);
+$zclient = new ZClient("94bb758cd838d00064cfe3aafe33aa46");
+$zclient->delete("Contacts", "1892544000000167080");
+/**
+ * Loading Details of all the modules for easier access of the APIs.(Not always necessay.Use depending on usage.)
+ * <br> <b>Note:</b>True to load from local file  and False to load from server.
+ */
+$zclient->loadModules(true);
+
+/**
+ * To get all user details as a json array.
+ *
+ */
+$userobjects = $zclient->users();
+OutputJSON("User Details", '$userobjects=$zclient->users();', $userobjects);
+
+/**
+ * To get all the module details.
+ */
+$moduleobjects = $zclient->modules();
+OutputJSON("Module Details", '$moduleobjects=$zclient->modules();', $moduleobjects);
+
+/**
+ * To get metadata of a module.
+ * eg.Contacts.
+ */
+$contactmetadata = $zclient->metadata('Contacts');
+OutputJSON("Contact Metadata Details", '$zclient->metadata(\'Contacts\');', $contactmetadata);
+
+/**
+ *
+ * To get layout of the modules or layout by id.
+ */
+$layout = $zclient->layouts(NULL, array("module" => "Contacts"));
+OutputJSON("Contact Layout Details", '$layout=$zclient->layouts(NULL,array("module"=>"Contacts"));', $layout);
+
+/**
+ * To get all the taxes.
+ */
+$taxes = $zclient->taxes();
+OutputJSON("Taxes Details", '$taxes=$zclient->taxes();', $taxes);
+
+/**
+ * To get all the contact roles.
+ */
+$contactroles = $zclient->roles();
+OutputJSON("Contact Role Details", '$contactroles=$zclient->roles();', $contactroles);
+/**
+ * To get all the tabgroups.
+ */
+$tab_groups = $zclient->tab_groups();
+OutputJSON("Tab Groups Details", '$tab_groups=$zclient->tab_groups();', $tab_groups);
+/**
+ *To insert an record into Zoho CRM.
+ * Returned as an array ZObjects.
+ */
+$contacts = $zclient->insert("Contacts", array(array("Last_Name" => "Last Name", "First_Name" => "First Name", "Email" => "sample@sample.com",)));
+OutputObjects("Inserting Record", '$contact = $zclient->insert("Contacts", array(array("Last_Name" => "Last Name", "First_Name" => "First Name", "email" => "sample@sample.com",)))', $contacts);
+$contact =& $contacts[0];
+
+/**
+ * To get an element by id got value.
+ */
+$contact->get();
+OutputObjects("Retreiving Record", '$contacts[0]->get();', array($contact));
+
+/**
+ * To update a contact;
+ */
+$contact['Other_Street'] = "Hacienda Drive";
+$contact['Other_City'] = "California";
+$contact['Other_State'] = "California";
+$contact['Other_Country'] = "USA";
+$contact->update();
+OutputObjects("Updating Record", '$contact->update();', array($contact));
+
+
+/**
+ * Insering notes in a contact
+ */
+$notes = $contact->insert_notes(array(array("Note_Title" => "Track", "Note_Content" => "Work Completed")));
+OutputObjects("Inseting notes in Contact Record", 'notes=$contact->insert_notes(array(array("Note_Title"=>"Track","Note_Content"=>"Work Completed")));', $notes);
+
+
+/**
+ * Fetching Related List
+ */
+$relatednotes = $contact->related_list("Notes");
+OutputObjects("Related notes in Contact Record", '$relatednotes=$contact->related_list("Notes");', $relatednotes);
+
+
+/**
+ * Updating a relation
+ */
+$updatedrelation = $contact->update_relation("Notes", NULL, $relatednotes[0]['id'], array(array("Note_Title" => "Updated", "Note_Content" => "Updated Notes")));
+OutputObjects("Related notes in Contact Record", '$relatednotes=$contact->related_list("Notes");', $updatedrelation);
+
+
+/**
+ *Delete a note that has been added.
+ *Two Methods.
+ */
+//$relatednotes[0]->delete;
+$return = $contact->delete_relation("Notes", NULL, $relatednotes[0]['id']);
+OutputJSON("Deleteing Relation of notes and contacts", '$return=$contact->delete_relation("Notes",NULL,$relatednotes[0][\'id\']);', array($return));
+
+
+/**
+ * To upload a photo to contact or lead.
+ */
+$ret = $zclient->upload_photo("Contacts", "1892544000000158102", "enterprise_plus_card.png", "image/png");
+OutputJSON("Uploading A Photo", '$ret=$zclient->upload_photo("Contacts","1892544000000158102","enterprise_plus_card.png","image/png");', array($ret));
+
+/**
+ * To download a photo from contact or lead.
+ */
+$ret = $zclient->download_photo("Contacts", "1892544000000158102", "./mydownloaded.png");
+OutputJSON("Downlading A Photo", '$ret=$zclient->download_photo("Contacts","1892544000000158102","./mydownloaded.png");', array($ret));
+
+/**
+ * To download a list of files
+ */
+$myrelatedlist = $zclient->related_list("Contacts", "1892544000000099001", "Attachments", NULL);
+OutputJSON("Downloading A File", '$zclient->download_file("Contacts", "1892544000000099001", NULL,$attachment[\'id\'],$attachment[\'File_Name\']);s', $myrelatedlist);
+foreach ($myrelatedlist as $attachment) {
+    $ret = $zclient->download_file("Contacts", "1892544000000099001", NULL, $attachment['id'], $attachment['File_Name']);
+    var_dump($ret);
+}
+
+
+?>
+</body>
+</html>
+

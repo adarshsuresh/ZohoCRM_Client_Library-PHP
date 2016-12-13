@@ -1,0 +1,287 @@
+<?php
+/**
+ * The file contains utility functionalies that can be used to make the api call easier.
+ *
+ * @package ZohoCRM_Client_Library
+ */
+/**
+ * @copyright  (c) 2016.  Zoho Corporation
+ *  All rights reserved.
+ *  Redistribution and use in source and binary forms, with or without modification, are permitted provided
+ *  that the following conditions are met:
+ *
+ *  Redistributions of source code must retain the above copyright notice, this list of conditions and the
+ *  following disclaimer.
+ *
+ *  Redistributions in binary form must reproduce the above copyright notice, this list of conditions and
+ *  the following disclaimer in the documentation and/or other materials provided with the distribution.
+ *
+ *  Neither the name of Zoho Corp nor the names of its contributors may be used to endorse or
+ *  promote products derived from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ *  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ *  PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ *  ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+ *  TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ *  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ *
+ * @author Adarsh Suresh Managalth <adarsh@zohocorp.com
+ *
+ */
+
+/**
+ * Class ZAccounts Generates authtoken and deletes authtoken for api purpose.
+ */
+class ZAccounts
+{
+    /**
+     * Username of the user.
+     * @access private
+     * @var string
+     */
+    private $username;
+    /**
+     * Password of the user.
+     * @access private
+     * @var string
+     */
+    private $password;
+    /**
+     * Generated Authtoken is stored.
+     * @access private
+     * @var string
+     */
+    private $authtoken;
+    /**
+     * Display name of authtoken.
+     * @access private
+     * @var string
+     */
+    private $displayname;
+    /**
+     * Header of the returned result.
+     * @access private
+     * @var array
+     */
+    public $header;
+    /**
+     * Body of the returned result.
+     * @access private
+     * @var array|string
+     */
+    public $body;
+
+    /**
+     * Accounts URL for zoho.
+     */
+    const _DEFAULT_ACCOUNTS_URL = "https://accounts.zoho.com/apiauthtoken/";
+
+    /**
+     * ZAccounts constructor.
+     * @param $username Username of the user.
+     * @param $password Password of the user.
+     * @param $displayname Display name of authtoken.
+     */
+    function __construct($username, $password, $displayname="crmapi")
+    {
+        $this->username = $username;
+        $this->password = $password;
+        $this->displayname = $displayname;
+
+    }
+
+    /**
+     * @internal 
+     * Generates the auth url and makes the request.
+     * @param $urlpath  URL to which generate authtoken request is sent.
+     * @return mixed  Authtoken if the request is success.
+     * @throws Exception For all invalid access throws exception.Check error message for more details.
+     */
+    private function _generate_authtoken($urlpath)
+    {
+  
+        $params = array("EMAIL_ID" => $this->username, "PASSWORD" => $this->password, "DISPLAY_NAME" => $this->displayname, "SCOPE" => "ZohoCRM/crmapi");
+        $cURL = curl_init($urlpath);
+        curl_setopt($cURL, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_setopt($cURL, CURLOPT_FAILONERROR, true);
+        curl_setopt($cURL, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($cURL, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($cURL, CURLOPT_HEADER, true);
+        curl_setopt($cURL, CURLOPT_HTTPHEADER, array('X-Accept: json', 'Content-Type:application/x-www-form-urlencoded;charset=UTF-8'));
+        curl_setopt($cURL, CURLOPT_URL, $urlpath);
+        curl_setopt($cURL, CURLOPT_POSTFIELDS, http_build_query($params));
+        curl_setopt($cURL, CURLOPT_CONNECTTIMEOUT, 5000);
+        $response = curl_exec($cURL);
+        if (!$response)
+            throw new Exception(curl_error($cURL), curl_errno($cURL));
+        $this->_parse_header_body($cURL,$response);
+        curl_close($cURL);
+        return $this->_process_result($this->body);
+
+
+    }
+
+    /**
+     * @internal 
+     * Parses header and body of the request.
+     * @param $cURL The curl object that made the request.
+     * @param $response Response received from the request.
+     */
+    private function _parse_header_body($cURL,$response)
+    {
+        $header_size = curl_getinfo($cURL, CURLINFO_HEADER_SIZE);
+        $headerContent = substr($response, 0, $header_size);
+        $headers = array();
+        $arrRequests = explode("\r\n\r\n", $headerContent);
+        for ($index = 0; $index < count($arrRequests) - 1; $index++) {
+
+            foreach (explode("\r\n", $arrRequests[$index]) as $i => $line) {
+                if ($i === 0)
+                    $headers[$index]['http_code'] = $line;
+                else {
+                    list ($key, $value) = explode(': ', $line);
+                    $headers[$index][$key] = $value;
+                }
+            }
+        }
+        $headers = array_pop($headers);
+        $body = substr($response, $header_size);
+        $this->header = $headers;
+        $this->body = json_decode($body, true);
+        if(!isset($this->body))
+            $this->body=$body;
+
+    }
+
+
+    /**
+     * @internal 
+     * Process the result of the logib call and make changes to make the call again if necessary.
+     * @param $ret_JSON The result json from the authtoken request.
+     * @return mixed Returns the authtoken if success.
+     * @throws Exception For all invalid access throws exception.Check error message for more details.
+     */
+    private function _process_result($ret_JSON)
+    {
+        if ($ret_JSON['status'])
+        {
+            $this->authtoken=$ret_JSON['token'];
+            return $this->authtoken;
+        }
+        elseif (array_key_exists('location',$ret_JSON))
+        {
+            $is_pfx=$ret_JSON['is_prefix'];
+            $dcl_bcd=$ret_JSON['basedomain'];
+            $dcl_pfx=$ret_JSON['location'];
+            $urlpath=$this::_DEFAULT_ACCOUNTS_URL . "nb/create";
+            if($is_pfx)
+            {
+                str_replace("accounts",$dcl_pfx."-"."accounts",$urlpath);
+            }
+            str_replace("zoho.com",$dcl_bcd,$urlpath);
+            return $this->_generate_authtoken($urlpath);
+        }
+        else
+        {
+            $this->_check_error($this->body);
+        }
+
+    }
+
+    /**
+     * @internal 
+     * Checks any error in the authtoken request.
+     * @throws Exception For all invalid access throws exception.Check error message for more details.
+     */
+    private function _check_error()
+    {
+        $ret = $this->body;
+        if (!$ret['status']) {
+            if (array_key_exists('error',$ret))
+                throw new Exception($this->_error_message($ret['error']));
+            else
+                throw new Exception($this->_error_message("null"));
+
+        }
+
+    }
+
+    /**
+     * @internal 
+     * Return the error message depending on error code,
+     * @param $value  Value of the error code recived.
+     * @return string Error message for the request depending on value provided.
+     */
+    private function _error_message($value)
+    {
+        if (strcmp("WEB_LOGIN_REQUIRED", $value) == 0) {
+            return "Please use application specific password instead of your password.";
+
+        } else if (strcmp("EXCEEDED_MAXIMUM_ALLOWED_AUTHTOKENS", $value) == 0) {
+            return "Exceeded maximum allowed authtokens";
+        } else if (strcmp("null", $value) == 0) {
+            return "Incorrect Email or Password.";
+        } else if (strcmp("ACCOUNT_REGISTRATION_NOT_CONFIRMED", $value) == 0) {
+            return "Email address has not been confirmed. Please confirm your email address to login to the application.";
+        } else if (strcmp("REMOTE_SERVER_ERROR", $value) == 0) {
+            return "Unable to log in. Please Contact your CRM administrator for further assistance.";
+        } else if (strcmp("USER_NOT_ACTIVE", $value) == 0) {
+            return "You are InActive. Please Contact your CRM administrator for further assistance.";
+        } else if (strcmp("API_REQUEST_BLOCKED", $value) == 0) {
+            return "Your request have been blocked. Please Contact your CRM administrator for further assistance.";
+        } else if (strcmp("INVALID_PASSWORD", $value) == 0) {
+            return "Incorrect Password";
+        }
+    }
+
+    /**
+     * To retreive an authtoken.
+     * @return mixed Authtoken  if sucess.
+     * @throws Exception For all invalid access throws exception.Check error message for more details.
+     */
+    public function getAuthtoken()
+    {
+        if (isset($this->authtoken))
+            return $this->authtoken;
+        $urlpath = $this::_DEFAULT_ACCOUNTS_URL . "nb/create";
+        return $this->_generate_authtoken($urlpath);
+    }
+
+    /**
+     * Delete a perticular authtoken.
+     * @param null $token Token is either provided or the authtoken of the Account object is deleted.
+     * @return bool True if deleted and False otherwise.
+     * @throws Exception For all invalid access throws exception.Check error message for more details.
+     */
+    public function deleteAuthtoken($token=NULL)
+    {
+        if(!isset($token))
+            $token=$this->authtoken;
+        $url_path=$this::_DEFAULT_ACCOUNTS_URL."delete?AUTHTOKEN=".$token;
+        $cURL = curl_init();
+        curl_setopt($cURL, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_setopt($cURL, CURLOPT_FAILONERROR, true);
+        curl_setopt($cURL, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($cURL, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($cURL, CURLOPT_HEADER, true);
+        curl_setopt($cURL, CURLOPT_URL, $url_path);
+        $response = curl_exec($cURL);
+        if (!$response)
+            throw new Exception(curl_error($cURL), curl_errno($cURL));
+        $this->_parse_header_body($cURL,$response);
+        if(strpos($this->body, 'TRUE') !== false) {
+            unset($this->authtoken);
+            return TRUE;
+        }
+        else
+            return FALSE;
+
+    }
+}
+
+
+
+?>
